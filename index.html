@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pastel Blocks - Refined</title>
+    <title>Pastel Blocks - Precision</title>
     <style>
         /* CSS reset & base */
         * { box-sizing: border-box; touch-action: none; user-select: none; }
@@ -11,7 +11,7 @@
             margin: 0;
             padding: 0;
             font-family: 'Outfit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5; /* Cleaner, higher contrast background */
+            background-color: #f0f2f5;
             color: #2d3436;
             display: flex;
             flex-direction: column;
@@ -42,16 +42,15 @@
 
         #score-label { font-size: 0.7rem; color: #b2bec3; margin-bottom: -5px; }
         #score {
-            color: #d63031; /* Vibrant but still fits the palette */
+            color: #d63031;
             font-size: 2.5rem;
         }
 
-        /* The main grid */
         #game-board {
             width: 92vw;
             max-width: 420px;
             aspect-ratio: 1 / 1;
-            background-color: #dfe6e9; /* Darker board for better contrast */
+            background-color: #dfe6e9;
             border-radius: 16px;
             padding: 10px;
             display: grid;
@@ -62,10 +61,9 @@
         }
 
         .cell {
-            background-color: #f1f2f6; /* Lighter cells to contrast with board */
+            background-color: #f1f2f6;
             border-radius: 6px;
             transition: background-color 0.15s;
-            position: relative;
         }
 
         .cell.filled {
@@ -73,7 +71,6 @@
             border: 1.5px solid rgba(255,255,255,0.4);
         }
 
-        /* The dock for available shapes */
         #dock {
             width: 92vw;
             max-width: 420px;
@@ -93,10 +90,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
         }
 
-        /* Shapes */
         .shape {
             display: grid;
             gap: 2px;
@@ -111,7 +106,6 @@
             z-index: 1000;
             pointer-events: none;
             opacity: 0.95;
-            transform: scale(1.0) translateY(-20px);
             filter: drop-shadow(0 15px 15px rgba(0,0,0,0.2));
         }
 
@@ -122,15 +116,13 @@
             box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
         }
 
-        /* Higher contrast pastel colors */
-        .color-1 { background-color: #ff7675; } /* Coral Red */
-        .color-2 { background-color: #fab1a0; } /* Peach */
-        .color-3 { background-color: #ffeaa7; } /* Mellow Yellow */
-        .color-4 { background-color: #55efc4; } /* Mint */
-        .color-5 { background-color: #74b9ff; } /* Sky Blue */
-        .color-6 { background-color: #a29bfe; } /* Lavender */
+        .color-1 { background-color: #ff7675; }
+        .color-2 { background-color: #fab1a0; }
+        .color-3 { background-color: #ffeaa7; }
+        .color-4 { background-color: #55efc4; }
+        .color-5 { background-color: #74b9ff; }
+        .color-6 { background-color: #a29bfe; }
 
-        /* Game Over Modal */
         #game-over {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -163,19 +155,6 @@
             cursor: pointer;
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
             transition: all 0.2s;
-        }
-        #game-over button:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(0,0,0,0.3); }
-        #game-over button:active { transform: translateY(-1px); }
-
-        /* Animations */
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-            100% { transform: scale(1); }
-        }
-        @keyframes clear {
-            0% { transform: scale(1); opacity: 1; filter: brightness(1.5); }
-            100% { transform: scale(0); opacity: 0; }
         }
     </style>
 </head>
@@ -247,8 +226,6 @@
                 for (let c = 0; c < GRID_SIZE; c++) {
                     const cell = document.createElement('div');
                     cell.className = 'cell';
-                    cell.dataset.r = r;
-                    cell.dataset.c = c;
                     boardEl.appendChild(cell);
                 }
             }
@@ -300,7 +277,6 @@
 
         let draggedShapeEl = null;
         let draggedShapeObj = null;
-        let dragPointerOffset = { x: 0, y: 0 };
         let shadowCells = [];
 
         function handlePointerDown(e) {
@@ -309,33 +285,11 @@
             const slotIndex = shapeEl.dataset.slot;
             draggedShapeObj = dockShapes[slotIndex];
             
-            const rect = shapeEl.getBoundingClientRect();
-            
-            // Logic: we want the pointer to be at the center of the first block of the shape
-            // Let's find the first block's relative position
-            let firstBlockR = 0, firstBlockC = 0;
-            outer: for(let r=0; r<draggedShapeObj.matrix.length; r++) {
-                for(let c=0; c<draggedShapeObj.matrix[0].length; c++) {
-                    if(draggedShapeObj.matrix[r][c]) {
-                        firstBlockR = r; firstBlockC = c;
-                        break outer;
-                    }
-                }
-            }
-
-            // We calculate how far the pointer is from the center of that first block
-            const blockCenterRelX = (firstBlockC + 0.5) * 28; // 26px + 2px gap
-            const blockCenterRelY = (firstBlockR + 0.5) * 28;
-            
-            dragPointerOffset.x = e.clientX - (rect.left + blockCenterRelX);
-            dragPointerOffset.y = e.clientY - (rect.top + blockCenterRelY);
-
             draggedShapeEl = shapeEl.cloneNode(true);
             draggedShapeEl.classList.add('dragging');
             
             const boardRect = boardEl.getBoundingClientRect();
             const cellSize = (boardRect.width - 20 - (GRID_SIZE - 1) * 6) / GRID_SIZE;
-            const fullCellSize = cellSize + 6;
             
             const rows = draggedShapeObj.matrix.length;
             const cols = draggedShapeObj.matrix[0].length;
@@ -351,7 +305,7 @@
             });
 
             const isTouch = e.pointerType === 'touch';
-            const touchOffset = isTouch ? 80 : 0; // Move up on touch for visibility
+            const touchOffset = isTouch ? 100 : 0; // Move up on touch for visibility
 
             updateDraggedShapePos(e.clientX, e.clientY, touchOffset);
 
@@ -363,27 +317,10 @@
         }
 
         function updateDraggedShapePos(clientX, clientY, touchOffset) {
-            // Position the ghost so that the logical "first block center" matches the pointer (minus the touch offset)
-            // Rel X of first block in scaled world
-            const boardRect = boardEl.getBoundingClientRect();
-            const cellSize = (boardRect.width - 20 - (GRID_SIZE - 1) * 6) / GRID_SIZE;
-            const fullCellSize = cellSize + 6;
-
-            let firstBlockR = 0, firstBlockC = 0;
-            outer: for(let r=0; r<draggedShapeObj.matrix.length; r++) {
-                for(let c=0; c<draggedShapeObj.matrix[0].length; c++) {
-                    if(draggedShapeObj.matrix[r][c]) {
-                        firstBlockR = r; firstBlockC = c;
-                        break outer;
-                    }
-                }
-            }
-
-            const scaledBlockCenterRelX = (firstBlockC + 0.5) * fullCellSize;
-            const scaledBlockCenterRelY = (firstBlockR + 0.5) * fullCellSize;
-
-            draggedShapeEl.style.left = `${clientX - dragPointerOffset.x - scaledBlockCenterRelX}px`;
-            draggedShapeEl.style.top = `${clientY - dragPointerOffset.y - scaledBlockCenterRelY - touchOffset}px`;
+            const rect = draggedShapeEl.getBoundingClientRect();
+            // We want the center of the dragged shape to be at the cursor (minus touch offset)
+            draggedShapeEl.style.left = `${clientX - rect.width / 2}px`;
+            draggedShapeEl.style.top = `${clientY - rect.height / 2 - touchOffset}px`;
         }
 
         function handlePointerMove(e) {
@@ -391,7 +328,7 @@
             e.preventDefault();
             
             const isTouch = e.pointerType === 'touch';
-            const touchOffset = isTouch ? 80 : 0;
+            const touchOffset = isTouch ? 100 : 0;
 
             updateDraggedShapePos(e.clientX, e.clientY, touchOffset);
 
@@ -410,7 +347,7 @@
             document.removeEventListener('pointerup', handlePointerUp);
 
             const isTouch = e.pointerType === 'touch';
-            const touchOffset = isTouch ? 80 : 0;
+            const touchOffset = isTouch ? 100 : 0;
             const targetPos = getGridPosition(e.clientX, e.clientY - touchOffset);
             
             clearShadow();
@@ -439,12 +376,7 @@
 
         function getGridPosition(clientX, clientY) {
             const rect = boardEl.getBoundingClientRect();
-            // We find the grid cell closest to the pointer coordinates
-            // Since we snap the 'first block center' to the pointer, we just need to find which cell is under the pointer
-            
-            if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
-                return null;
-            }
+            if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
             
             const cellSize = (rect.width - 20 - (GRID_SIZE - 1) * 6) / GRID_SIZE;
             const fullCellSize = cellSize + 6;
@@ -452,24 +384,19 @@
             const relX = clientX - rect.left - 10;
             const relY = clientY - rect.top - 10;
 
-            let c = Math.floor(relX / fullCellSize);
-            let r = Math.floor(relY / fullCellSize);
+            // Which grid cell is under the mouse?
+            const targetGridC = Math.floor(relX / fullCellSize);
+            const targetGridR = Math.floor(relY / fullCellSize);
 
-            // Now, r,c is the cell the pointer is over. 
-            // This should be the target for the 'first block' of the shape.
-            // So we need to return the 'startR, startC' such that shape[firstBlockR][firstBlockC] is at r,c.
+            // The mouse is at the center of the shape matrix.
+            // So we calculate the top-left (startR, startC) based on the shape's center.
+            const rows = draggedShapeObj.matrix.length;
+            const cols = draggedShapeObj.matrix[0].length;
             
-            let firstBlockR = 0, firstBlockC = 0;
-            outer: for(let fr=0; fr<draggedShapeObj.matrix.length; fr++) {
-                for(let fc=0; fc<draggedShapeObj.matrix[0].length; fc++) {
-                    if(draggedShapeObj.matrix[fr][fc]) {
-                        firstBlockR = fr; firstBlockC = fc;
-                        break outer;
-                    }
-                }
-            }
+            const startC = targetGridC - Math.floor((cols - 1) / 2);
+            const startR = targetGridR - Math.floor((rows - 1) / 2);
 
-            return { r: r - firstBlockR, c: c - firstBlockC };
+            return { r: startR, c: startC };
         }
 
         function canPlaceShape(shapeObj, startR, startC) {
@@ -529,11 +456,9 @@
         function checkLines() {
             let rowsToClear = [];
             let colsToClear = [];
-
             for (let r = 0; r < GRID_SIZE; r++) {
                 if (grid[r].every(cell => cell !== null)) rowsToClear.push(r);
             }
-
             for (let c = 0; c < GRID_SIZE; c++) {
                 let full = true;
                 for (let r = 0; r < GRID_SIZE; r++) {
@@ -541,24 +466,17 @@
                 }
                 if (full) colsToClear.push(c);
             }
-
             if (rowsToClear.length === 0 && colsToClear.length === 0) return;
-
             let cellsToClear = new Set();
             rowsToClear.forEach(r => { for (let c = 0; c < GRID_SIZE; c++) cellsToClear.add(`${r},${c}`); });
             colsToClear.forEach(c => { for (let r = 0; r < GRID_SIZE; r++) cellsToClear.add(`${r},${c}`); });
-
             cellsToClear.forEach(id => {
                 const [r, c] = id.split(',').map(Number);
                 grid[r][c] = null;
                 const cellEl = getCellEl(r, c);
-                cellEl.style.animation = 'clear 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards';
-                setTimeout(() => {
-                    cellEl.className = 'cell';
-                    cellEl.style.animation = '';
-                }, 400);
+                cellEl.style.animation = 'clear 0.4s forwards';
+                setTimeout(() => { cellEl.className = 'cell'; cellEl.style.animation = ''; }, 400);
             });
-
             let basePoints = (rowsToClear.length + colsToClear.length) * 10;
             if (rowsToClear.length + colsToClear.length > 1) basePoints *= (rowsToClear.length + colsToClear.length);
             score += basePoints;
@@ -567,8 +485,6 @@
 
         function updateScore() {
             scoreEl.innerText = score;
-            scoreEl.style.animation = 'pop 0.2s';
-            setTimeout(() => scoreEl.style.animation = '', 200);
         }
 
         function checkGameOver() {
@@ -583,7 +499,6 @@
                 }
                 if (canPlay) break;
             }
-
             if (!canPlay) {
                 document.getElementById('final-score').innerText = score;
                 document.getElementById('game-over').style.display = 'flex';
