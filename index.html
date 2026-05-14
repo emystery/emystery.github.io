@@ -2,28 +2,561 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibe Check</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pastel Blocks</title>
     <style>
+        /* CSS reset & base */
+        * { box-sizing: border-box; touch-action: none; user-select: none; }
         body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fcf9f2; /* Relaxing off-white/cream */
+            color: #5d5c61;
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #7d90a0;
+        }
+
+        #score {
+            color: #ffb3ba; /* Pastel pink */
+            font-size: 2rem;
+        }
+
+        /* The main grid */
+        #game-board {
+            width: 90vw;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            background-color: #e8e6e1;
+            border-radius: 12px;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 4px;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .cell {
+            background-color: #f4f1ea;
+            border-radius: 4px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .cell.filled {
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+        }
+
+        /* The dock for available shapes */
+        #dock {
+            width: 90vw;
+            max-width: 400px;
+            height: 120px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: transparent;
+        }
+
+        .dock-slot {
+            width: 30%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Shapes */
+        .shape {
+            display: grid;
+            gap: 2px;
+            cursor: pointer;
+        }
+        
+        .shape.dragging {
+            position: fixed;
+            z-index: 1000;
+            pointer-events: none; /* Let events fall through to the grid */
+            opacity: 0.9;
+            transform: scale(1.1);
+        }
+
+        .shape-cell {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
+        }
+
+        /* Colors for shapes */
+        .color-1 { background-color: #ffb3ba; } /* Pastel pink */
+        .color-2 { background-color: #ffdfba; } /* Pastel orange */
+        .color-3 { background-color: #ffffba; } /* Pastel yellow */
+        .color-4 { background-color: #baffc9; } /* Pastel green */
+        .color-5 { background-color: #bae1ff; } /* Pastel blue */
+        .color-6 { background-color: #e8baff; } /* Pastel purple */
+
+        /* Game Over Modal */
+        #game-over {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(252, 249, 242, 0.85);
+            backdrop-filter: blur(4px);
+            display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #39FF14;
-            font-family: Arial, sans-serif;
+            z-index: 2000;
         }
-        h1 {
-            color: red;
-            font-size: 5rem;
-            text-align: center;
+
+        #game-over h2 {
+            font-size: 3rem;
+            color: #7d90a0;
+            margin-bottom: 10px;
+        }
+
+        #game-over button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 25px;
+            background-color: #bae1ff;
+            color: #5d5c61;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        #game-over button:active {
+            transform: scale(0.95);
+        }
+
+        /* Animations */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        @keyframes clear {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <h1>DEPLOYMENT ACTIVE</h1>
-    <h1>Vibe Check: Alfredo</h1>
+
+    <div id="header">
+        <div>Blocks</div>
+        <div id="score">0</div>
+    </div>
+
+    <div id="game-board"></div>
+
+    <div id="dock">
+        <div class="dock-slot" id="slot-0"></div>
+        <div class="dock-slot" id="slot-1"></div>
+        <div class="dock-slot" id="slot-2"></div>
+    </div>
+
+    <div id="game-over">
+        <h2>Game Over</h2>
+        <div style="font-size: 1.5rem; margin-bottom: 20px;">Score: <span id="final-score">0</span></div>
+        <button onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        const GRID_SIZE = 8;
+        let grid = [];
+        let score = 0;
+        let dockShapes = [null, null, null];
+        
+        const boardEl = document.getElementById('game-board');
+        const scoreEl = document.getElementById('score');
+        const dockSlots = [
+            document.getElementById('slot-0'),
+            document.getElementById('slot-1'),
+            document.getElementById('slot-2')
+        ];
+
+        // Pastel colors map
+        const COLORS = ['color-1', 'color-2', 'color-3', 'color-4', 'color-5', 'color-6'];
+
+        // Define shapes (1 means block, 0 means empty)
+        const SHAPES = [
+            { matrix: [[1]], name: 'dot' },
+            { matrix: [[1,1]], name: 'h2' },
+            { matrix: [[1],[1]], name: 'v2' },
+            { matrix: [[1,1,1]], name: 'h3' },
+            { matrix: [[1],[1],[1]], name: 'v3' },
+            { matrix: [[1,1,1,1]], name: 'h4' },
+            { matrix: [[1],[1],[1],[1]], name: 'v4' },
+            { matrix: [[1,1],[1,1]], name: 'square2' },
+            { matrix: [[1,1,1],[1,1,1],[1,1,1]], name: 'square3' },
+            { matrix: [[1,1],[1,0]], name: 'l-small-1' },
+            { matrix: [[1,1],[0,1]], name: 'l-small-2' },
+            { matrix: [[1,0],[1,1]], name: 'l-small-3' },
+            { matrix: [[0,1],[1,1]], name: 'l-small-4' },
+            { matrix: [[1,0,0],[1,0,0],[1,1,1]], name: 'l-large-1' },
+            { matrix: [[1,1,1],[1,0,0],[1,0,0]], name: 'l-large-2' },
+            { matrix: [[0,0,1],[0,0,1],[1,1,1]], name: 'l-large-3' },
+            { matrix: [[1,1,1],[0,0,1],[0,0,1]], name: 'l-large-4' },
+            { matrix: [[0,1,0],[1,1,1],[0,1,0]], name: 'cross' }
+        ];
+
+        function initGrid() {
+            boardEl.innerHTML = '';
+            grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function getCellEl(r, c) {
+            return boardEl.children[r * GRID_SIZE + c];
+        }
+
+        function generateShapes() {
+            for (let i = 0; i < 3; i++) {
+                if (!dockShapes[i]) {
+                    const shapeDef = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                    const colorClass = COLORS[Math.floor(Math.random() * COLORS.length)];
+                    dockShapes[i] = { ...shapeDef, color: colorClass, slot: i };
+                    renderDockShape(dockShapes[i], i);
+                }
+            }
+            checkGameOver();
+        }
+
+        function renderDockShape(shapeObj, slotIndex) {
+            const slot = dockSlots[slotIndex];
+            slot.innerHTML = '';
+            if (!shapeObj) return;
+
+            const shapeEl = document.createElement('div');
+            shapeEl.className = 'shape';
+            shapeEl.dataset.slot = slotIndex;
+            
+            const rows = shapeObj.matrix.length;
+            const cols = shapeObj.matrix[0].length;
+            shapeEl.style.gridTemplateColumns = `repeat(${cols}, 24px)`;
+            shapeEl.style.gridTemplateRows = `repeat(${rows}, 24px)`;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cellEl = document.createElement('div');
+                    if (shapeObj.matrix[r][c]) {
+                        cellEl.className = `shape-cell ${shapeObj.color}`;
+                    }
+                    shapeEl.appendChild(cellEl);
+                }
+            }
+
+            shapeEl.addEventListener('pointerdown', handlePointerDown);
+            slot.appendChild(shapeEl);
+        }
+
+        let draggedShapeEl = null;
+        let draggedShapeObj = null;
+        let dragOffset = { x: 0, y: 0 };
+        let shadowCells = [];
+
+        function handlePointerDown(e) {
+            if (e.button !== 0 && e.type !== 'touchstart' && e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
+            const shapeEl = e.currentTarget;
+            const slotIndex = shapeEl.dataset.slot;
+            draggedShapeObj = dockShapes[slotIndex];
+            
+            const rect = shapeEl.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+
+            draggedShapeEl = shapeEl.cloneNode(true);
+            draggedShapeEl.classList.add('dragging');
+            
+            const boardRect = boardEl.getBoundingClientRect();
+            const cellSize = (boardRect.width - (GRID_SIZE - 1) * 4 - 16) / GRID_SIZE;
+            
+            const rows = draggedShapeObj.matrix.length;
+            const cols = draggedShapeObj.matrix[0].length;
+            draggedShapeEl.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+            draggedShapeEl.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+            
+            Array.from(draggedShapeEl.children).forEach(child => {
+                if(child.classList.contains('shape-cell')) {
+                    child.style.width = `${cellSize}px`;
+                    child.style.height = `${cellSize}px`;
+                }
+            });
+
+            const isTouch = e.pointerType === 'touch';
+            
+            draggedShapeEl.style.left = `${e.clientX - dragOffset.x}px`;
+            draggedShapeEl.style.top = isTouch ? `${e.clientY - dragOffset.y - 60}px` : `${e.clientY - dragOffset.y}px`;
+
+            document.body.appendChild(draggedShapeEl);
+            shapeEl.style.opacity = '0.2'; 
+
+            document.addEventListener('pointermove', handlePointerMove, { passive: false });
+            document.addEventListener('pointerup', handlePointerUp);
+        }
+
+        function handlePointerMove(e) {
+            if (!draggedShapeEl) return;
+            e.preventDefault(); // Prevent scrolling while dragging
+            
+            const isTouch = e.pointerType === 'touch';
+            let left = e.clientX - dragOffset.x;
+            let top = e.clientY - dragOffset.y;
+            if (isTouch) top -= 60; // Offset for visibility on touch
+
+            draggedShapeEl.style.left = `${left}px`;
+            draggedShapeEl.style.top = `${top}px`;
+
+            clearShadow();
+            const targetPos = getGridPosition(e.clientX, isTouch ? e.clientY - 60 : e.clientY);
+            if (targetPos) {
+                if (canPlaceShape(draggedShapeObj, targetPos.r, targetPos.c)) {
+                    drawShadow(draggedShapeObj, targetPos.r, targetPos.c);
+                }
+            }
+        }
+
+        function handlePointerUp(e) {
+            if (!draggedShapeEl) return;
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+
+            const isTouch = e.pointerType === 'touch';
+            const targetPos = getGridPosition(e.clientX, isTouch ? e.clientY - 60 : e.clientY);
+            
+            clearShadow();
+            let placed = false;
+
+            if (targetPos && canPlaceShape(draggedShapeObj, targetPos.r, targetPos.c)) {
+                placeShape(draggedShapeObj, targetPos.r, targetPos.c);
+                placed = true;
+            }
+
+            draggedShapeEl.remove();
+            draggedShapeEl = null;
+
+            const originalShape = dockSlots[draggedShapeObj.slot].querySelector('.shape');
+            if (placed) {
+                dockShapes[draggedShapeObj.slot] = null;
+                dockSlots[draggedShapeObj.slot].innerHTML = '';
+                
+                checkLines();
+                
+                if (dockShapes.every(s => s === null)) {
+                    generateShapes();
+                } else {
+                    checkGameOver();
+                }
+            } else {
+                if(originalShape) originalShape.style.opacity = '1';
+            }
+            draggedShapeObj = null;
+        }
+
+        function getGridPosition(clientX, clientY) {
+            const rect = boardEl.getBoundingClientRect();
+            if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+                return null;
+            }
+            
+            const cellWidth = (rect.width - 16 - (GRID_SIZE - 1) * 4) / GRID_SIZE;
+            const cellHeight = (rect.height - 16 - (GRID_SIZE - 1) * 4) / GRID_SIZE;
+            
+            // Re-adjust drag offset to scaled cell size for accurate drop point
+            const scaleX = cellWidth / 24; 
+            const scaleY = cellHeight / 24;
+            
+            const relativeX = clientX - (dragOffset.x * scaleX) - rect.left - 8;
+            const relativeY = clientY - (dragOffset.y * scaleY) - rect.top - 8;
+
+            let c = Math.round(relativeX / (cellWidth + 4));
+            let r = Math.round(relativeY / (cellHeight + 4));
+
+            return { r, c };
+        }
+
+        function canPlaceShape(shapeObj, startR, startC) {
+            const rows = shapeObj.matrix.length;
+            const cols = shapeObj.matrix[0].length;
+            
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shapeObj.matrix[r][c]) {
+                        const tr = startR + r;
+                        const tc = startC + c;
+                        if (tr < 0 || tr >= GRID_SIZE || tc < 0 || tc >= GRID_SIZE) return false;
+                        if (grid[tr][tc]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function drawShadow(shapeObj, startR, startC) {
+            const rows = shapeObj.matrix.length;
+            const cols = shapeObj.matrix[0].length;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shapeObj.matrix[r][c]) {
+                        const cell = getCellEl(startR + r, startC + c);
+                        cell.style.backgroundColor = 'rgba(0,0,0,0.1)';
+                        shadowCells.push(cell);
+                    }
+                }
+            }
+        }
+
+        function clearShadow() {
+            shadowCells.forEach(cell => {
+                cell.style.backgroundColor = '';
+            });
+            shadowCells = [];
+        }
+
+        function placeShape(shapeObj, startR, startC) {
+            const rows = shapeObj.matrix.length;
+            const cols = shapeObj.matrix[0].length;
+            let blocksPlaced = 0;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shapeObj.matrix[r][c]) {
+                        grid[startR + r][startC + c] = shapeObj.color;
+                        const cell = getCellEl(startR + r, startC + c);
+                        cell.className = `cell filled ${shapeObj.color}`;
+                        cell.style.animation = 'pop 0.2s';
+                        blocksPlaced++;
+                    }
+                }
+            }
+            score += blocksPlaced;
+            updateScore();
+        }
+
+        function checkLines() {
+            let rowsToClear = [];
+            let colsToClear = [];
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                if (grid[r].every(cell => cell !== null)) {
+                    rowsToClear.push(r);
+                }
+            }
+
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let full = true;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    if (grid[r][c] === null) {
+                        full = false; break;
+                    }
+                }
+                if (full) colsToClear.push(c);
+            }
+
+            if (rowsToClear.length === 0 && colsToClear.length === 0) return;
+
+            let cellsToClear = new Set();
+            rowsToClear.forEach(r => {
+                for (let c = 0; c < GRID_SIZE; c++) cellsToClear.add(`${r},${c}`);
+            });
+            colsToClear.forEach(c => {
+                for (let r = 0; r < GRID_SIZE; r++) cellsToClear.add(`${r},${c}`);
+            });
+
+            cellsToClear.forEach(id => {
+                const [r, c] = id.split(',').map(Number);
+                grid[r][c] = null;
+                const cellEl = getCellEl(r, c);
+                cellEl.style.animation = 'clear 0.3s forwards';
+                setTimeout(() => {
+                    cellEl.className = 'cell';
+                    cellEl.style.animation = '';
+                }, 300);
+            });
+
+            let linePoints = (rowsToClear.length + colsToClear.length) * 10;
+            if (rowsToClear.length + colsToClear.length > 1) {
+                linePoints *= (rowsToClear.length + colsToClear.length);
+            }
+            score += linePoints;
+            updateScore();
+        }
+
+        function updateScore() {
+            scoreEl.innerText = score;
+        }
+
+        function checkGameOver() {
+            let canPlay = false;
+            for (let shape of dockShapes) {
+                if (shape === null) continue;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (canPlaceShape(shape, r, c)) {
+                            canPlay = true;
+                            break;
+                        }
+                    }
+                    if (canPlay) break;
+                }
+                if (canPlay) break;
+            }
+
+            if (!canPlay) {
+                dockSlots.forEach(slot => {
+                    if (slot.firstChild) {
+                        slot.firstChild.style.opacity = '0.5';
+                        slot.firstChild.style.pointerEvents = 'none';
+                    }
+                });
+                
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('game-over').style.display = 'flex';
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            updateScore();
+            document.getElementById('game-over').style.display = 'none';
+            dockShapes = [null, null, null];
+            initGrid();
+            generateShapes();
+        }
+
+        document.body.addEventListener('touchmove', function(e) {
+            // Prevent scrolling unless interacting with non-game elements if needed
+        }, { passive: false });
+
+        initGrid();
+        generateShapes();
+    </script>
 </body>
 </html>
