@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pastel Blocks - Precision</title>
+    <title>Pastel Blocks - Accessibility</title>
     <style>
         /* CSS reset & base */
         * { box-sizing: border-box; touch-action: none; user-select: none; }
@@ -90,16 +90,20 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 15px;
+        }
+        
+        .dock-slot:hover {
+            background-color: rgba(255,255,255,0.3);
         }
 
         .shape {
             display: grid;
             gap: 2px;
-            cursor: pointer;
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none; /* Let slot handle clicks */
         }
-        
-        .shape:hover { transform: scale(1.05); }
 
         .shape.dragging {
             position: fixed;
@@ -171,9 +175,9 @@
     <div id="game-board"></div>
 
     <div id="dock">
-        <div class="dock-slot" id="slot-0"></div>
-        <div class="dock-slot" id="slot-1"></div>
-        <div class="dock-slot" id="slot-2"></div>
+        <div class="dock-slot" id="slot-0" data-index="0"></div>
+        <div class="dock-slot" id="slot-1" data-index="1"></div>
+        <div class="dock-slot" id="slot-2" data-index="2"></div>
     </div>
 
     <div id="game-over">
@@ -254,7 +258,6 @@
 
             const shapeEl = document.createElement('div');
             shapeEl.className = 'shape';
-            shapeEl.dataset.slot = slotIndex;
             
             const rows = shapeObj.matrix.length;
             const cols = shapeObj.matrix[0].length;
@@ -270,10 +273,13 @@
                     shapeEl.appendChild(cellEl);
                 }
             }
-
-            shapeEl.addEventListener('pointerdown', handlePointerDown);
             slot.appendChild(shapeEl);
         }
+
+        // Setup slot listeners
+        dockSlots.forEach(slot => {
+            slot.addEventListener('pointerdown', handlePointerDown);
+        });
 
         let draggedShapeEl = null;
         let draggedShapeObj = null;
@@ -281,11 +287,14 @@
 
         function handlePointerDown(e) {
             if (e.button !== 0 && e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
-            const shapeEl = e.currentTarget;
-            const slotIndex = shapeEl.dataset.slot;
-            draggedShapeObj = dockShapes[slotIndex];
+            const slot = e.currentTarget;
+            const index = slot.dataset.index;
+            if (!dockShapes[index]) return;
             
-            draggedShapeEl = shapeEl.cloneNode(true);
+            draggedShapeObj = dockShapes[index];
+            const originalShapeEl = slot.querySelector('.shape');
+            
+            draggedShapeEl = originalShapeEl.cloneNode(true);
             draggedShapeEl.classList.add('dragging');
             
             const boardRect = boardEl.getBoundingClientRect();
@@ -305,12 +314,12 @@
             });
 
             const isTouch = e.pointerType === 'touch';
-            const touchOffset = isTouch ? 100 : 0; // Move up on touch for visibility
+            const touchOffset = isTouch ? 100 : 0;
 
             updateDraggedShapePos(e.clientX, e.clientY, touchOffset);
 
             document.body.appendChild(draggedShapeEl);
-            shapeEl.style.opacity = '0.2'; 
+            originalShapeEl.style.opacity = '0.2'; 
 
             document.addEventListener('pointermove', handlePointerMove, { passive: false });
             document.addEventListener('pointerup', handlePointerUp);
@@ -318,7 +327,6 @@
 
         function updateDraggedShapePos(clientX, clientY, touchOffset) {
             const rect = draggedShapeEl.getBoundingClientRect();
-            // We want the center of the dragged shape to be at the cursor (minus touch offset)
             draggedShapeEl.style.left = `${clientX - rect.width / 2}px`;
             draggedShapeEl.style.top = `${clientY - rect.height / 2 - touchOffset}px`;
         }
@@ -326,18 +334,13 @@
         function handlePointerMove(e) {
             if (!draggedShapeEl) return;
             e.preventDefault();
-            
             const isTouch = e.pointerType === 'touch';
             const touchOffset = isTouch ? 100 : 0;
-
             updateDraggedShapePos(e.clientX, e.clientY, touchOffset);
-
             clearShadow();
             const targetPos = getGridPosition(e.clientX, e.clientY - touchOffset);
-            if (targetPos) {
-                if (canPlaceShape(draggedShapeObj, targetPos.r, targetPos.c)) {
-                    drawShadow(draggedShapeObj, targetPos.r, targetPos.c);
-                }
+            if (targetPos && canPlaceShape(draggedShapeObj, targetPos.r, targetPos.c)) {
+                drawShadow(draggedShapeObj, targetPos.r, targetPos.c);
             }
         }
 
@@ -345,26 +348,22 @@
             if (!draggedShapeEl) return;
             document.removeEventListener('pointermove', handlePointerMove);
             document.removeEventListener('pointerup', handlePointerUp);
-
             const isTouch = e.pointerType === 'touch';
             const touchOffset = isTouch ? 100 : 0;
             const targetPos = getGridPosition(e.clientX, e.clientY - touchOffset);
-            
             clearShadow();
             let placed = false;
-
             if (targetPos && canPlaceShape(draggedShapeObj, targetPos.r, targetPos.c)) {
                 placeShape(draggedShapeObj, targetPos.r, targetPos.c);
                 placed = true;
             }
-
             draggedShapeEl.remove();
             draggedShapeEl = null;
-
-            const originalShape = dockSlots[draggedShapeObj.slot].querySelector('.shape');
+            const slot = dockSlots[draggedShapeObj.slot];
+            const originalShape = slot.querySelector('.shape');
             if (placed) {
                 dockShapes[draggedShapeObj.slot] = null;
-                dockSlots[draggedShapeObj.slot].innerHTML = '';
+                slot.innerHTML = '';
                 checkLines();
                 if (dockShapes.every(s => s === null)) generateShapes();
                 else checkGameOver();
@@ -377,25 +376,16 @@
         function getGridPosition(clientX, clientY) {
             const rect = boardEl.getBoundingClientRect();
             if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
-            
             const cellSize = (rect.width - 20 - (GRID_SIZE - 1) * 6) / GRID_SIZE;
             const fullCellSize = cellSize + 6;
-
             const relX = clientX - rect.left - 10;
             const relY = clientY - rect.top - 10;
-
-            // Which grid cell is under the mouse?
             const targetGridC = Math.floor(relX / fullCellSize);
             const targetGridR = Math.floor(relY / fullCellSize);
-
-            // The mouse is at the center of the shape matrix.
-            // So we calculate the top-left (startR, startC) based on the shape's center.
             const rows = draggedShapeObj.matrix.length;
             const cols = draggedShapeObj.matrix[0].length;
-            
             const startC = targetGridC - Math.floor((cols - 1) / 2);
             const startR = targetGridR - Math.floor((rows - 1) / 2);
-
             return { r: startR, c: startC };
         }
 
