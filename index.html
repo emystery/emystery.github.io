@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pastel Blocks - v1.1</title>
+    <title>Pastel Blocks - v1.2</title>
     <style>
         /* CSS reset & base */
         * { box-sizing: border-box; touch-action: none; user-select: none; }
@@ -45,17 +45,22 @@
             text-transform: uppercase;
         }
 
-        #score-container {
+        #stats-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-box {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
         }
 
-        #score-label { font-size: 0.7rem; color: #b2bec3; margin-bottom: -5px; }
-        #score {
-            color: #d63031;
-            font-size: 2.5rem;
-        }
+        .stat-label { font-size: 0.7rem; color: #b2bec3; margin-bottom: -5px; }
+        .stat-value { font-size: 2.2rem; }
+        
+        #score { color: #d63031; }
+        #best-score { color: #636e72; }
 
         #game-board {
             width: 92vw;
@@ -175,13 +180,19 @@
 </head>
 <body>
 
-    <div id="version">v1.1.0</div>
+    <div id="version">v1.2.0</div>
 
     <div id="header">
         <div id="title">Blocks</div>
-        <div id="score-container">
-            <span id="score-label">SCORE</span>
-            <span id="score">0</span>
+        <div id="stats-container">
+            <div class="stat-box">
+                <span class="stat-label">BEST</span>
+                <span id="best-score" class="stat-value">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">SCORE</span>
+                <span id="score" class="stat-value">0</span>
+            </div>
         </div>
     </div>
 
@@ -203,10 +214,12 @@
         const GRID_SIZE = 8;
         let grid = [];
         let score = 0;
+        let bestScore = parseInt(localStorage.getItem('blockBlast_bestScore')) || 0;
         let dockShapes = [null, null, null];
         
         const boardEl = document.getElementById('game-board');
         const scoreEl = document.getElementById('score');
+        const bestScoreEl = document.getElementById('best-score');
         const dockSlots = [
             document.getElementById('slot-0'),
             document.getElementById('slot-1'),
@@ -246,6 +259,7 @@
                     boardEl.appendChild(cell);
                 }
             }
+            updateScore();
         }
 
         function getCellEl(r, c) {
@@ -487,6 +501,11 @@
 
         function updateScore() {
             scoreEl.innerText = score;
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('blockBlast_bestScore', bestScore);
+            }
+            bestScoreEl.innerText = bestScore;
         }
 
         function checkGameOver() {
